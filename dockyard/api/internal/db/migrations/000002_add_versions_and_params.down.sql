@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS volumes;
+DROP TABLE IF EXISTS ports;
+DROP TABLE IF EXISTS parameters;
+DROP TABLE IF EXISTS image_versions;
