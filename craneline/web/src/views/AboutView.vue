@@ -1,113 +1,152 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Node, Edge } from '@vue-flow/core'  
-import { VueFlow } from '@vue-flow/core'
+import { VueFlow, useVueFlow, ConnectionLineType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 
-import CustomNode from '@/components/CustomNode.vue'
-// these components are only shown as examples of how to use a custom node or edge
-// you can find many examples of how to create these custom components in the examples page of the docs
-import SpecialNode from '@/components/SpecialNode.vue'
-import SpecialEdge from '@/components/SpecialEdge.vue'
+import CustomNode from '@/components/nodes/CustomNode.vue'
+import NetworkNode from '@/components/nodes/NetworkNode.vue'
+import useDragAndDrop from '@/assets/useDnD.js'
+import DropzoneBackground from '@/components/DropzoneBackground.vue'
+import Sidebar from '@/components/SidebarDnD.vue'
+import type { NodeMouseEvent } from '@vue-flow/core'
+import DockerImageDrawer from '@/components/DockerImageConfigDrawer.vue'
+
+
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer'
+
+
+import { mockDockerImages } from './mockDockerImages'
+
+const { onDragOver, onDrop, onDragLeave, isDragOver } = useDragAndDrop()
+const { onConnect, addEdges, onNodeDoubleClick, findNode } = useVueFlow()
+
 
 import '@vue-flow/minimap/dist/style.css'
 
-// const node2 = ref(CustomNode)
+const nodes = ref([])
 
 
+const drawerOpen = ref(false)
+const selectedNode = ref()
 
-// these are our nodes
-const nodes = ref<Node[]>([
-  // an input node, specified by using `type: 'input'`
-  {
-    id: '1',
-    type: 'input',
-    position: { x: 250, y: 5 },
-    // all nodes can have a data object containing any data you want to pass to the node
-    // a label can property can be used for default nodes
-    data: { label: 'Node 1' },
-  },
+onNodeDoubleClick((event: NodeMouseEvent) => {
+  selectedNode.value = event.node
+  drawerOpen.value = true
+})
 
-  // default node, you can omit `type: 'default'` as it's the fallback type
-  {
-    id: '2',
-    position: { x: 100, y: 100 },
-    data: { label: 'Node 2' },
-  },
+function handleOpenConfig(nodeId: string) {
+  const node = findNode(nodeId)
+  console.log('node trouvé:', node) // <-- vérifie ça
+  selectedNode.value = node
+  drawerOpen.value = true
+  console.log('drawerOpen:', drawerOpen.value) // <-- et ça
+}
 
-  // An output node, specified by using `type: 'output'`
-  {
-    id: '3',
-    type: 'output',
-    position: { x: 400, y: 200 },
-    data: { label: 'Node 3' },
-  },
+onConnect(addEdges)
 
-  // this is a custom node
-  // we set it by using a custom type name we choose, in this example `special`
-  // the name can be freely chosen, there are no restrictions as long as it's a string
-  {
-    id: '4',
-    type: 'special', // <-- this is the custom node type name
-    position: { x: 400, y: 200 },
-    data: {
-      label: 'Node 4',
-      hello: 'world',
-    },
-  },
-])
 
-// these are our edges
-const edges = ref<Edge[]>([
-  // default bezier edge
-  // consists of an edge id, source node id and target node id
-  {
-    id: 'e1->2',
-    source: '1',
-    target: '2',
-  },
+// Helper lines
 
-  // set `animated: true` to create an animated edge path
-  {
-    id: 'e2->3',
-    source: '2',
-    target: '3',
-    animated: true,
-  },
+import { onMounted, onUnmounted } from 'vue'
+import type { NodeChange } from '@vue-flow/core'
+import { getHelperLines } from '@/assets/helperLines.ts'
+import HelperLines from '@/components/HelperLines.vue'
 
-  // a custom edge, specified by using a custom type name
-  // we choose `type: 'special'` for this example
-  {
-    id: 'e3->4',
-    type: 'special',
-    source: '3',
-    target: '4',
+const { onNodesChange, applyNodeChanges, getNodes } = useVueFlow()
 
-    // all edges can have a data object containing any data you want to pass to the edge
-    data: {
-      hello: 'world',
-    }
-  },
-])
+const isShiftPressed = ref(false)
+const helperLineHorizontal = ref<number | undefined>(undefined)
+const helperLineVertical = ref<number | undefined>(undefined)
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Shift') isShiftPressed.value = true
+}
+function onKeyUp(e: KeyboardEvent) {
+  if (e.key === 'Shift') isShiftPressed.value = false
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
+})
+
+// on intercepte les changements AVANT qu'ils soient appliqués
+onNodesChange((changes: NodeChange[]) => {
+  // reset par défaut
+  helperLineHorizontal.value = undefined
+  helperLineVertical.value = undefined
+
+  // on ne modifie le comportement que si :
+  // - shift est appuyé
+  // - un seul node est en train d'être déplacé (dragging)
+  // - c'est bien un changement de type 'position'
+  if (
+    isShiftPressed.value &&
+    changes.length === 1 &&
+    changes[0].type === 'position' &&
+    changes[0].dragging &&
+    changes[0].position
+  ) {
+    const result = getHelperLines(changes[0], getNodes.value)
+
+    helperLineHorizontal.value = result.horizontal
+    helperLineVertical.value = result.vertical
+
+    // on écrase la position du node par la position "snappée"
+    changes[0].position.x = result.snapPosition.x ?? changes[0].position.x
+    changes[0].position.y = result.snapPosition.y ?? changes[0].position.y
+  }
+
+  applyNodeChanges(changes)
+})
 </script>
 
 <template>
-  <div class="app-wrapper">
-    <VueFlow class="bg-zinc-800" :nodes="nodes" :edges="edges">
-      <Background :gap="200" patternColor="#d4d4d8" variant="lines" />
+  <div class="h-full flex" @drop="onDrop">
+    <Sidebar :images="mockDockerImages" />
+    <VueFlow class="bg-zinc-800" :nodes="nodes" @dragover="onDragOver" @dragleave="onDragLeave" :delete-key-code="['Backspace', 'Delete']" :default-edge-options="{ type: 'smoothstep' }" :connection-line-type="ConnectionLineType.SmoothStep">
+      <DropzoneBackground
+        :style="{
+          backgroundColor: isDragOver ? '#52525b' : 'transparent',
+          transition: 'background-color 0.2s ease',
+        }"
+      >
+        <p class="text-white" v-if="isDragOver">Drop here</p>
+      </DropzoneBackground>
+      <Background :gap="50" patternColor="#d4d4d8" variant="lines" />
       <MiniMap maskColor="#3f3f46" pannable zoomable />
-      <!-- <template #node-special="specialNodeProps">
-        <SpecialNode v-bind="specialNodeProps" />
-      </template> -->
       <template #node-custom="nodeProps">
-        <CustomNode :data="nodeProps.data" />
+        <CustomNode v-bind="nodeProps" @open-config="handleOpenConfig" />
       </template>
-      <!-- <template #edge-special="specialEdgeProps">
-        <SpecialEdge v-bind="specialEdgeProps" />
-      </template> -->
+      <template #node-network="nodeProps">
+        <NetworkNode v-bind="nodeProps" />
+      </template>
+      <template #node-dockerImage="nodeProps">
+        <CustomNode v-bind="nodeProps"  @open-config="handleOpenConfig" />
+      </template>
+
+      <!-- Helper lines -->
+      <HelperLines
+        :horizontal="helperLineHorizontal"
+        :vertical="helperLineVertical"
+      />
     </VueFlow>
   </div>
+  <DockerImageDrawer v-model:open="drawerOpen" :node="selectedNode" />
 </template>
 
 <style>
