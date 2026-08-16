@@ -11,6 +11,9 @@ import DropzoneBackground from '@/components/DropzoneBackground.vue'
 import Sidebar from '@/components/SidebarDnD.vue'
 import type { NodeMouseEvent } from '@vue-flow/core'
 import DockerImageDrawer from '@/components/DockerImageConfigDrawer.vue'
+import PortNode from '@/components/nodes/PortNode.vue'
+import VolumeNode from '@/components/nodes/VolumeNode.vue'
+import EnvFileNode from '@/components/nodes/EnvFileNode.vue'
 
 
 import {
@@ -113,39 +116,66 @@ onNodesChange((changes: NodeChange[]) => {
 
   applyNodeChanges(changes)
 })
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 </script>
 
 <template>
-  <div class="h-full flex" @drop="onDrop">
-    <Sidebar :images="mockDockerImages" />
-    <VueFlow class="bg-zinc-800" :nodes="nodes" @dragover="onDragOver" @dragleave="onDragLeave" :delete-key-code="['Backspace', 'Delete']" :default-edge-options="{ type: 'smoothstep' }" :connection-line-type="ConnectionLineType.SmoothStep">
-      <DropzoneBackground
-        :style="{
-          backgroundColor: isDragOver ? '#52525b' : 'transparent',
-          transition: 'background-color 0.2s ease',
-        }"
-      >
-        <p class="text-white" v-if="isDragOver">Drop here</p>
-      </DropzoneBackground>
-      <Background :gap="50" patternColor="#d4d4d8" variant="lines" />
-      <MiniMap maskColor="#3f3f46" pannable zoomable />
-      <template #node-custom="nodeProps">
-        <CustomNode v-bind="nodeProps" @open-config="handleOpenConfig" />
-      </template>
-      <template #node-network="nodeProps">
-        <NetworkNode v-bind="nodeProps" />
-      </template>
-      <template #node-dockerImage="nodeProps">
-        <CustomNode v-bind="nodeProps"  @open-config="handleOpenConfig" />
-      </template>
 
-      <!-- Helper lines -->
-      <HelperLines
-        :horizontal="helperLineHorizontal"
-        :vertical="helperLineVertical"
-      />
-    </VueFlow>
-  </div>
+<ResizablePanelGroup
+    direction="horizontal"
+    class="w-full h-full"
+    @drop="onDrop"
+  >
+    <ResizablePanel class="min-w-45 max-w-[80%]" :default-size="15">
+        <Sidebar class="w-full h-full" :images="mockDockerImages" />
+    </ResizablePanel>
+
+    <ResizableHandle />
+
+    <ResizablePanel :default-size="85">
+      <VueFlow class="bg-zinc-800" :nodes="nodes" @dragover="onDragOver" @dragleave="onDragLeave" :delete-key-code="['Backspace', 'Delete']" :default-edge-options="{ type: 'smoothstep' }" :connection-line-type="ConnectionLineType.SmoothStep">
+        <DropzoneBackground
+          :style="{
+            backgroundColor: isDragOver ? '#52525b' : 'transparent',
+            transition: 'background-color 0.2s ease',
+          }"
+        >
+          <p class="text-white" v-if="isDragOver">Drop here</p>
+        </DropzoneBackground>
+        <Background :gap="50" patternColor="#d4d4d8" variant="lines" />
+        <MiniMap maskColor="#3f3f46" pannable zoomable />
+        <template #node-custom="nodeProps">
+          <CustomNode v-bind="nodeProps" @open-config="handleOpenConfig" />
+        </template>
+        <template #node-network="nodeProps">
+          <NetworkNode v-bind="nodeProps" />
+        </template>
+        <template #node-dockerImage="nodeProps">
+          <CustomNode v-bind="nodeProps"  @open-config="handleOpenConfig" />
+        </template>
+        <template #node-ports="nodeProps">
+          <PortNode v-bind="nodeProps" />
+        </template>
+        <template #node-volume="nodeProps">
+          <VolumeNode v-bind="nodeProps" />
+        </template>
+        <template #node-envFile="nodeProps">
+          <EnvFileNode v-bind="nodeProps" />
+        </template>
+
+
+        
+        <HelperLines
+          :horizontal="helperLineHorizontal"
+          :vertical="helperLineVertical"
+        />
+      </VueFlow>
+    </ResizablePanel>
+  </ResizablePanelGroup>
   <DockerImageDrawer v-model:open="drawerOpen" :node="selectedNode" />
 </template>
 

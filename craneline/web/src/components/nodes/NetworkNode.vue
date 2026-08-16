@@ -13,9 +13,9 @@ const props = defineProps<NodeProps>()
     <button>expand</button>
   </NodeToolbar> -->
 
-    <div class="w-full h-full rounded px-4 py-2 text-white hover:bg-sky-500" :class="props.selected 
-      ? 'bg-sky-500 border border-amber-400 ' 
-      : 'bg-sky-400 border border-sky-500'">
+    <div class="w-full h-full rounded px-4 py-2 text-white" :class="props.selected 
+      ? 'bg-indigo-500 border border-indigo-300 ring-1 ring-indigo-300 shadow-lg shadow-indigo-400/50' 
+      : 'bg-indigo-400 border border-indigo-500'">
         <div>
             Network
         </div>
