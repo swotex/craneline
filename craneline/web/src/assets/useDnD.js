@@ -107,31 +107,37 @@ export default function useDragAndDrop() {
 
   //   addNodes(newNode)
   // }
-  function onDrop(event) {
+function onDrop(event) {
   const raw = event.dataTransfer?.getData('application/vueflow')
-  if (!raw) return
+  const type = event.dataTransfer?.getData('type')
 
-  const image = JSON.parse(raw)
-  // const position = screenToFlowCoordinate({ x: event.clientX - left, y: event.clientY - top })
+  if (!type) return // le seul vrai garde-fou nécessaire
+
+  const image = raw ? JSON.parse(raw) : null
+
   const position = screenToFlowCoordinate({
-      x: event.clientX,
-      y: event.clientY,
-    })
+    x: event.clientX,
+    y: event.clientY,
+  })
 
-  // taille dynamique selon le contenu, ex: en fonction du nombre de ports à afficher
-  const height = 60 + image.ports.length * 20
+  // taille dynamique seulement si on a une image (sinon taille par défaut)
+  const height = image ? 60 + image.ports.length * 20 : 60
 
   const newNode = {
     id: getId(),
-    type: 'dockerImage', // un seul type de composant custom pour toutes les images
+    type: type,
     position,
-    data: {
-      label: image.name,
-      tag: image.tag,
-      ports: image.ports,
-      category: image.category,
-      description: image.description,
-    },
+    data: image
+      ? {
+          label: image.name,
+          tag: image.tag,
+          ports: image.ports,
+          category: image.category,
+          description: image.description,
+        }
+      : {
+          label: type, // ex: "network"
+        },
     style: {
       width: '200px',
       height: `${height}px`,
