@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/go-chi/chi/v5"
 
 	db "octopus/internal/db/generated"
 	"octopus/internal/service"
@@ -36,6 +36,12 @@ type createFullImageRequest struct {
 	Tag         string         `json:"tag"`
 	Digest      string         `json:"digest"`
 	Params      []paramRequest `json:"params"`
+}
+
+type addVersionRequest struct {
+	Tag    string         `json:"tag"`
+	Digest string         `json:"digest"`
+	Params []paramRequest `json:"params"`
 }
 
 func NewImageHandler(q *db.Queries, pool *pgxpool.Pool) *ImageHandler {
@@ -78,7 +84,7 @@ type createImageRequest struct {
 	LogoURL     string `json:"logo_url"`
 }
 
-// POST /api/v1/images
+// POST /api/v1/images/all
 func (h *ImageHandler) CreateImage(w http.ResponseWriter, r *http.Request) {
 	var req createImageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -110,7 +116,7 @@ func (h *ImageHandler) CreateImage(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, image)
 }
 
-// POST /api/v1/images/full
+// POST /api/v1/images/new
 func (h *ImageHandler) CreateFullImage(w http.ResponseWriter, r *http.Request) {
 	var req createFullImageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -173,4 +179,65 @@ func (h *ImageHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, image)
+}
+
+// POST /api/v1/images/versions/{id}/new
+func (h *ImageHandler) AddVersion(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	imageID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	var req addVersionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.Tag == "" {
+		respondError(w, http.StatusBadRequest, "tag is required")
+		return
+	}
+
+	params := make([]service.ParamInput, 0, len(req.Params))
+	for _, p := range req.Params {
+		params = append(params, service.ParamInput{
+			EnvVarName:   p.EnvVarName,
+			Type:         p.Type,
+			DefaultValue: p.DefaultValue,
+			Required:     p.Required,
+			Description:  p.Description,
+		})
+	}
+
+	version, err := service.AddVersion(r.Context(), h.Pool, service.AddVersionInput{
+		ImageID: imageID,
+		Tag:     req.Tag,
+		Params:  params,
+	})
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to add version")
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, version)
+}
+
+// GET /api/v1/images/versions/{id}/all
+func (h *ImageHandler) ListVersions(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	imageID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	versions, err := h.Queries.ListVersionsByImageID(r.Context(), imageID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to fetch versions")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, versions)
 }

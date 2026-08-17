@@ -29,13 +29,20 @@ type CreateFullImageInput struct {
 }
 
 type FullImage struct {
-	Image    db.Image             `json:"image"`
-	Versions []FullImageVersion   `json:"versions"`
+	Image    db.Image           `json:"image"`
+	Versions []FullImageVersion `json:"versions"`
 }
 
 type FullImageVersion struct {
 	db.ImageVersion
 	Parameters []db.Parameter `json:"parameters"`
+}
+
+type AddVersionInput struct {
+	ImageID int64
+	Tag     string
+	Digest  string
+	Params  []ParamInput
 }
 
 func CreateFullImage(ctx context.Context, pool *pgxpool.Pool, in CreateFullImageInput) (db.Image, db.ImageVersion, error) {
@@ -115,4 +122,44 @@ func GetFullImage(ctx context.Context, pool *pgxpool.Pool, imageID int64) (FullI
 	}
 
 	return result, nil
+}
+
+func AddVersion(ctx context.Context, pool *pgxpool.Pool, in AddVersionInput) (db.ImageVersion, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return db.ImageVersion{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	q := db.New(tx)
+
+	version, err := q.CreateImageVersion(ctx, db.CreateImageVersionParams{
+		ImageID:  in.ImageID,
+		Tag:      in.Tag,
+		Digest:   pgtype.Text{String: in.Digest, Valid: in.Digest != ""},
+		IsLatest: true,
+	})
+	if err != nil {
+		return db.ImageVersion{}, err
+	}
+
+	for _, p := range in.Params {
+		_, err := q.CreateParameter(ctx, db.CreateParameterParams{
+			ImageVersionID: version.ID,
+			EnvVarName:     p.EnvVarName,
+			Type:           p.Type,
+			DefaultValue:   pgtype.Text{String: p.DefaultValue, Valid: p.DefaultValue != ""},
+			Required:       p.Required,
+			Description:    pgtype.Text{String: p.Description, Valid: p.Description != ""},
+		})
+		if err != nil {
+			return db.ImageVersion{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return db.ImageVersion{}, err
+	}
+
+	return version, nil
 }

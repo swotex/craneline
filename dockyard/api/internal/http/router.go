@@ -17,8 +17,12 @@ func NewRouter(imageHandler *handlers.ImageHandler) *chi.Mux {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/images", func(r chi.Router) {
 			r.Get("/all", imageHandler.ListImages)
-			r.Post("/new", imageHandler.CreateFullImage)
 			r.Get("/{id}", imageHandler.GetImage)
+			r.Post("/new", imageHandler.CreateFullImage)
+			r.Route("/versions/{id}", func(r chi.Router) {
+				r.Post("/new", imageHandler.AddVersion)
+				r.Get("/all", imageHandler.ListVersions)
+			})
 		})
 	})
 
