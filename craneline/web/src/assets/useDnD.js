@@ -120,8 +120,21 @@ function onDrop(event) {
     y: event.clientY,
   })
 
-  // taille dynamique seulement si on a une image (sinon taille par défaut)
-  const height = image ? 60 + image.ports.length * 20 : 60
+  const HEADER_HEIGHT = 60
+  const LINE_HEIGHT = 20
+  const MIN_WIDTH = 200
+  const CHAR_WIDTH = 7 // approx px par caractère
+  const PADDING = 40
+
+  const height = image ? HEADER_HEIGHT + (image.ports?.length ?? 0) * LINE_HEIGHT : 60
+
+  const width = image
+    ? Math.max(
+        MIN_WIDTH,
+        [image.name, image.tag, ...(image.ports ?? []).map(p => `${p.container_port}/${p.protocol}`)]
+          .reduce((max, s) => Math.max(max, (s ?? '').length), 0) * CHAR_WIDTH + PADDING
+      )
+    : 200
 
   const newNode = {
     id: getId(),
@@ -129,17 +142,20 @@ function onDrop(event) {
     position,
     data: image
       ? {
-          label: image.name,
-          tag: image.tag,
-          ports: image.ports,
-          category: image.category,
+          id: image.id,
+          name: image.name,
+          registry: image.registry,
           description: image.description,
+          logo_url: image.logo_url,
+          versions: null,
+          selectedVersionId: null,
+          _detailsLoaded: false,
         }
       : {
-          label: type, // ex: "network"
+          label: type, // ex: "network", "volume", "envFile"
         },
     style: {
-      width: '200px',
+      width: `${width}px`,
       height: `${height}px`,
     },
   }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import useDragAndDrop from '@/assets/useDnD.js'
 import { TriangleAlert } from '@lucide/vue';
+import { imagesService } from '@/services/imagesService'
 
 interface DockerImage {
   name: string
@@ -11,7 +13,9 @@ interface DockerImage {
 }
 
 const { onDragStart } = useDragAndDrop()
-const props = defineProps<{ images: DockerImage[] }>()
+// const props = defineProps<{ images: DockerImage[] }>()
+const images = ref([])
+const error = ref(null)
 
 
 function onDragStartImage(event: DragEvent, image: DockerImage | null, type: string) {
@@ -24,6 +28,15 @@ function onDragStartImage(event: DragEvent, image: DockerImage | null, type: str
   // draggedType.value = type
 }
 
+onMounted(async () => {
+  try {
+    images.value = await imagesService.getAll()
+  } catch (e : any) {
+    error.value = e.message
+  } finally {
+    // loading.value = false
+  }
+})
 </script>
 
 <template>
@@ -71,12 +84,12 @@ function onDragStartImage(event: DragEvent, image: DockerImage | null, type: str
       
       <div
         v-for="image in images"
-        :key="image.name"
+        :key="image.id"
         class="bg-teal-600 border border-teal-700 text-white w-38 h-10 rounded flex justify-center items-center cursor-grab hover:bg-teal-500 transition-colors"
         :draggable="true"
         @dragstart="onDragStartImage($event, image, 'dockerImage')"
       >
-        {{ image.name }}:{{ image.tag }}
+        {{ image.name }}
       </div>
 
       
